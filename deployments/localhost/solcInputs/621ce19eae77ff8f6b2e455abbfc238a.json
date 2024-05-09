@@ -1,0 +1,35 @@
+{
+  "language": "Solidity",
+  "sources": {
+    "contracts/tax_trace.sol": {
+      "content": "// SPDX-License-Identifier: MIT\npragma solidity ^0.8.9;\n\nerror Owner_Authentication_failed(address payer);\nerror priority_is_Set_Already();\n\ncontract tax_trace{\n\n    address owner;\n\n    struct Departments {\n        string p_first;\n        string p_sec;\n        string p_third;\n        string p_fourth;\n    }\n\n    struct taxPayer {\n        string Name;\n        uint Age;\n        uint Income;\n        bool status;\n    }\n    \n    struct eRupee {\n        uint One;\n        uint Five;\n        uint Ten;\n    }\n\n    constructor () {\n        owner = msg.sender;\n    }\n\n    event taxPayer_created(\n        address indexed payer,\n        bool status\n    );\n\n    event taxPaid(\n        address indexed payer,\n        bool status\n    );\n\n    event tokenCounted(\n        address indexed payer,\n        uint one,\n        uint five,\n        uint ten\n    );\n\n    modifier notPaidAlready(address payer) {\n        if (taxPayersmap[payer].status == true) {\n            revert(\"paid already\");\n        }\n        else {\n            _;\n        }\n    }\n\n    modifier ownerAuth(address payer) {\n        if (owner != payer) {\n            revert Owner_Authentication_failed(payer);\n        } else {\n            _;\n        }\n    }\n\n    modifier existAlready(address payer) {\n        bool flag = false;\n        for(uint i=0; i<payersArray.length; i++) {\n            if (payersArray[i] == payer) {\n                flag = true;\n            } else {\n                flag = false;\n            }\n        }\n        if (flag) {\n            revert(\"Payer Already exists\");\n        } else {\n            _;\n        }\n    }\n\n    modifier notExistAlready(address payer) {\n        bool flag = false;\n        for(uint i=0; i<payersArray.length; i++) {\n            if (payersArray[i] == payer) {\n                flag = true;\n            }\n        }\n        if (!flag) {\n            revert(\"Payer Does Not exist\");\n        } else {\n            _;\n        }\n    }\n\n    mapping (address => taxPayer) private taxPayersmap;\n    mapping (address => uint256) private paidTaxPayersmap;\n    address [] private paidTaxPayers;\n    address[] private payersArray;\n    mapping (address => eRupee) private tokenCountMap;\n    uint [] private randomTokenArray;\n    // mapping (address => Departments) private departmentCodes;\n    // bool[4] private prioritiesSet; \n\n    function createTaxPayer(\n        string memory name,\n        uint age,\n        uint income      //income in wei\n    ) external existAlready(msg.sender) notPaidAlready(msg.sender) {\n        \n        taxPayer memory payer = taxPayer({\n            Name: name, \n            Age: age, \n            Income: income * 1e18,\n            status: false\n        });\n        \n        taxPayersmap[msg.sender] = payer;\n        payersArray.push(msg.sender);\n        emit taxPayer_created(msg.sender,false);\n    }\n\n    function payTax(uint ones, uint fives, uint tens) external payable \n        notPaidAlready(msg.sender) \n        notExistAlready(msg.sender){\n\n        taxPayer memory payer = taxPayersmap[msg.sender];\n        eRupee memory tokenDivision;\n        uint256 income = payer.Income;\n        uint256 amount;\n        \n        if(0e18 < income && income <= 10e18) {\n            amount = 1 * 1e18;\n            require(msg.value == amount, \"Payable amount is 1 Eth\");\n            require((ones * 1e18 + fives * 5e18 + tens * 10e18) == amount, \"Check the token count\");\n            tokenDivision = eRupee({\n                One: ones,\n                Five: fives,\n                Ten: tens\n            });\n            if (tokenDivision.One != 0) {randomTokenArray.push(tokenDivision.One * 1);}\n            if (tokenDivision.Five != 0) {randomTokenArray.push(tokenDivision.Five * 5);}  \n            if (tokenDivision.Ten != 0) {randomTokenArray.push(tokenDivision.Ten * 10);}\n\n        }\n        else if(10e18 < income && income <= 25e18) {\n            amount = 5e18;\n            require(msg.value == amount, \"Payable amount is 5 Eth\");\n            require((ones * 1e18 + fives * 5e18 + tens * 10e18) == amount, \"Check the token count\");\n            tokenDivision = eRupee({\n                One: ones,\n                Five: fives,\n                Ten: tens\n            });\n            if (tokenDivision.One != 0) {randomTokenArray.push(tokenDivision.One * 1);}\n            if (tokenDivision.Five != 0) {randomTokenArray.push(tokenDivision.Five * 5);}\n            if (tokenDivision.Ten != 0) {randomTokenArray.push(tokenDivision.Ten * 10);}\n            \n        }\n        else {\n            amount = 10e18;\n            require(msg.value == amount, \"Payable amount is 10 Eth\");\n            require((ones * 1e18 + fives * 5e18 + tens * 10e18) == amount, \"Check the token count\");\n            tokenDivision = eRupee({\n                One: ones,\n                Five: fives,\n                Ten: tens\n            });\n            if (tokenDivision.One != 0) {randomTokenArray.push(tokenDivision.One * 1);}\n            if (tokenDivision.Five != 0) {randomTokenArray.push(tokenDivision.Five * 5);} \n            if (tokenDivision.Ten != 0) {randomTokenArray.push(tokenDivision.Ten * 10);}\n            \n        }\n\n        tokenCountMap[msg.sender] = tokenDivision;\n        paidTaxPayersmap[msg.sender] += msg.value;\n        taxPayersmap[msg.sender].status = true;\n        paidTaxPayers.push(msg.sender);\n        emit taxPaid(msg.sender, true);\n        emit tokenCounted(msg.sender, ones, fives, tens);\n    }\n\n    function taxDistribution () ownerAuth(msg.sender) public view returns(uint [] memory ) {\n        return randomTokenArray;\n    }\n\n    function showOwner() public view returns(address) {\n        return owner;\n    }\n\n    function showPaidTaxPayers() public view returns(address[] memory ) {\n        return paidTaxPayers;\n    }\n\n    function showDetails() notExistAlready(msg.sender) public view returns(taxPayer memory) {\n        return taxPayersmap[msg.sender];\n    }\n\n    function showTokens() public view returns(eRupee memory) {\n        return tokenCountMap[msg.sender];\n    }\n\n    function showTaxAmountPaid() public view returns(uint256) {\n        return paidTaxPayersmap[msg.sender];\n    }\n\n    // function showPriorities() public view returns(Departments memory) {\n    //     return departmentCodes[msg.sender];\n    // }\n\n\n}\n\n\n"
+    }
+  },
+  "settings": {
+    "optimizer": {
+      "enabled": false,
+      "runs": 200
+    },
+    "outputSelection": {
+      "*": {
+        "*": [
+          "abi",
+          "evm.bytecode",
+          "evm.deployedBytecode",
+          "evm.methodIdentifiers",
+          "metadata",
+          "devdoc",
+          "userdoc",
+          "storageLayout",
+          "evm.gasEstimates"
+        ],
+        "": [
+          "ast"
+        ]
+      }
+    },
+    "metadata": {
+      "useLiteralContent": true
+    }
+  }
+}
